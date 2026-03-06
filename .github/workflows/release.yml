@@ -1,1 +1,25 @@
+name: Create Release
 
+on:
+  push:
+    paths:
+      - 'addons/**'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Zip addons
+        run: |
+          cd addons
+          for dir in */; do
+            zip -r "${dir%/}.zip" "$dir"
+          done
+          
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ github.run_number }}
+          files: addons/*.zip
