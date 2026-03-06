@@ -1,6 +1,6 @@
 bl_info = {
     "name": "Collection(s) to GLB",
-    "author": "Dan & Popi from 3D Content Team (Prompted in Claude AI)",
+    "author": "Daniel Marcin from 3D Content Team (Prompted in Claude AI)",
     "version": (1, 0, 0),
     "blender": (4, 5, 0),
     "location": "View3D > N-Panel > GLB Export",
@@ -2405,5 +2405,6 @@ def unregister():
 if __name__ == "__main__":
 
     register()
+
 
 
