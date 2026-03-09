@@ -28,7 +28,7 @@ from bpy.props import BoolProperty
 GITHUB_USER = "Dan-3D"
 GITHUB_REPO = "blender-addons"
 ADDON_FOLDER = "CollectionToGLB_Dan"
-CURRENT_VERSION = (1, 0, 0)
+CURRENT_VERSION = bl_info["version"]
 
 update_available = False
 latest_release_data = None
@@ -2513,6 +2513,7 @@ def unregister():
 
 if __name__ == "__main__":
     register()
+
 
 
 
