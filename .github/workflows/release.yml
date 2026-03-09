@@ -27,6 +27,18 @@ jobs:
         run: |
           VERSION=$(grep -oP 'version.*?\(\K[0-9, ]+' addons/${{ steps.changed.outputs.addon }}/__init__.py | tr -d ' ' | tr ',' '.')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Check if release exists
+        id: check
+        run: |
+          TAG="${{ steps.changed.outputs.addon }}-v${{ steps.version.outputs.version }}"
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "Release $TAG already exists!"
+            echo "ERROR: Change version number in __init__.py before committing."
+            exit 1
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           
       - name: Zip addon
         run: |
