@@ -78,6 +78,7 @@ jobs:
                       "maintainer": manifest.get("maintainer", ""),
                       "type": manifest.get("type", "add-on"),
                       "blender_version_min": manifest.get("blender_version_min", "4.2.0"),
+                      "license": manifest.get("license", ["SPDX:GPL-3.0-or-later"]),
                       "archive_url": f"./{addon_name}.zip",
                       "archive_size": size,
                       "archive_hash": f"sha256:{sha256}"
