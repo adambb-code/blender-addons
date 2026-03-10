@@ -1,1 +1,11 @@
+schema_version = "1.0.0"
+id = "glb_exporter_china"
+name = "GLB Exporter"
+version = "1.0.0"
+tagline = "Export collections as GLB with automatic scaling and material baking"
+maintainer = "Dan & Popi from 3D Content Team"
+type = "add-on"
+blender_version_min = "4.2.0"
 
+[permissions]
+files = "Import/export GLB files"
