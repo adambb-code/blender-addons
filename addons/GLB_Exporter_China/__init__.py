@@ -1,12 +1,3 @@
-bl_info = {
-    "name": "GLB Exporter",
-    "author": "Dan & Popi from 3D Content Team (Prompted in Claude AI)",
-    "version": (1, 0, 0),
-    "blender": (4, 5, 0),
-    "location": "View3D > N-Panel > GLB Export",
-    "description": "Export collections as GLB with automatic scaling and material baking",
-    "category": "Import-Export",
-}
 
 import bpy
 import os
@@ -1289,3 +1280,4 @@ def unregister():
 
 if __name__ == "__main__":
     register()
+
