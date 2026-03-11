@@ -1,5 +1,4 @@
 name: Build and Deploy Extensions
-
 on:
   push:
     branches:
@@ -7,24 +6,110 @@ on:
     paths:
       - 'addons/**'
   workflow_dispatch:
-
 permissions:
   contents: read
   pages: write
   id-token: write
-
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
+      - name: Sync versions from bl_info to manifest
+        run: |
+          python3 << 'EOF'
+          import os
+          import re
+          import tomllib
+          
+          for addon_name in os.listdir('addons'):
+              init_path = f'addons/{addon_name}/__init__.py'
+              manifest_path = f'addons/{addon_name}/blender_manifest.toml'
+              
+              if not os.path.exists(init_path) or not os.path.exists(manifest_path):
+                  continue
+              
+              # Extract bl_info from __init__.py
+              with open(init_path, 'r') as f:
+                  content = f.read()
+              
+              # Find bl_info dictionary
+              match = re.search(r'bl_info\s*=\s*\{([^}]+)\}', content, re.DOTALL)
+              if not match:
+                  print(f"No bl_info found in {addon_name}")
+                  continue
+              
+              bl_info_str = match.group(1)
+              
+              # Extract version tuple
+              version_match = re.search(r'"version"\s*:\s*\((\d+),\s*(\d+),\s*(\d+)\)', bl_info_str)
+              if not version_match:
+                  print(f"No version found in bl_info for {addon_name}")
+                  continue
+              
+              version = f"{version_match.group(1)}.{version_match.group(2)}.{version_match.group(3)}"
+              
+              # Extract other fields
+              name_match = re.search(r'"name"\s*:\s*"([^"]+)"', bl_info_str)
+              tagline_match = re.search(r'"description"\s*:\s*"([^"]+)"', bl_info_str)
+              author_match = re.search(r'"author"\s*:\s*"([^"]+)"', bl_info_str)
+              blender_match = re.search(r'"blender"\s*:\s*\((\d+),\s*(\d+),\s*(\d+)\)', bl_info_str)
+              
+              # Read current manifest
+              with open(manifest_path, 'r') as f:
+                  manifest_content = f.read()
+              
+              # Update version
+              manifest_content = re.sub(
+                  r'version\s*=\s*"[^"]+"',
+                  f'version = "{version}"',
+                  manifest_content
+              )
+              
+              # Update name if found
+              if name_match:
+                  manifest_content = re.sub(
+                      r'name\s*=\s*"[^"]+"',
+                      f'name = "{name_match.group(1)}"',
+                      manifest_content
+                  )
+              
+              # Update tagline from description if found
+              if tagline_match:
+                  manifest_content = re.sub(
+                      r'tagline\s*=\s*"[^"]+"',
+                      f'tagline = "{tagline_match.group(1)}"',
+                      manifest_content
+                  )
+              
+              # Update maintainer from author if found
+              if author_match:
+                  manifest_content = re.sub(
+                      r'maintainer\s*=\s*"[^"]+"',
+                      f'maintainer = "{author_match.group(1)}"',
+                      manifest_content
+                  )
+              
+              # Update blender_version_min if found
+              if blender_match:
+                  blender_ver = f"{blender_match.group(1)}.{blender_match.group(2)}.{blender_match.group(3)}"
+                  manifest_content = re.sub(
+                      r'blender_version_min\s*=\s*"[^"]+"',
+                      f'blender_version_min = "{blender_ver}"',
+                      manifest_content
+                  )
+              
+              # Write updated manifest
+              with open(manifest_path, 'w') as f:
+                  f.write(manifest_content)
+              
+              print(f"Synced {addon_name}: v{version}")
+          EOF
       - name: Build Extensions
         run: |
           mkdir -p dist
@@ -32,19 +117,13 @@ jobs:
           for addon_dir in addons/*/; do
             if [ -f "${addon_dir}blender_manifest.toml" ]; then
               addon_name=$(basename "$addon_dir")
-              
-              # Get version from manifest
               version=$(grep -oP 'version\s*=\s*"\K[^"]+' "${addon_dir}blender_manifest.toml")
-              
-              # Create zip
               cd addons
               zip -r "../dist/${addon_name}.zip" "$addon_name"
               cd ..
-              
               echo "Built: ${addon_name} v${version}"
             fi
           done
-
       - name: Generate index.json
         run: |
           python3 << 'EOF'
@@ -52,9 +131,7 @@ jobs:
           import os
           import tomllib
           import hashlib
-
           extensions = []
-
           for addon_name in os.listdir('addons'):
               manifest_path = f'addons/{addon_name}/blender_manifest.toml'
               zip_path = f'dist/{addon_name}.zip'
@@ -63,7 +140,6 @@ jobs:
                   with open(manifest_path, 'rb') as f:
                       manifest = tomllib.load(f)
                   
-                  # Calculate file size and hash
                   with open(zip_path, 'rb') as f:
                       content = f.read()
                       size = len(content)
@@ -89,26 +165,20 @@ jobs:
                   
                   extensions.append(ext)
                   print(f"Added: {manifest.get('name')} v{manifest.get('version')}")
-
           index = {
               "version": "1.0.0",
               "blocklist": [],
               "data": extensions
           }
-
           with open('dist/index.json', 'w') as f:
               json.dump(index, f, indent=2)
-
           print(f"\nGenerated index.json with {len(extensions)} extension(s)")
           EOF
-
       - name: Setup Pages
         uses: actions/configure-pages@v4
-
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist
-
       - name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4
