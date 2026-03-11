@@ -1,4 +1,4 @@
-schema_version = "1.0.1"
+schema_version = "1.0.2"
 id = "glb_exporter_china"
 name = "GLB Exporter"
 version = "1.0.1"
