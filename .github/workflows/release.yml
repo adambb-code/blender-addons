@@ -7,7 +7,7 @@ on:
       - 'addons/**'
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 jobs:
@@ -16,16 +16,20 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       - name: Sync versions from bl_info to manifest
+        id: sync
         run: |
           python3 << 'EOF'
           import os
           import re
-          import tomllib
+          
+          changes_made = False
           
           for addon_name in os.listdir('addons'):
               init_path = f'addons/{addon_name}/__init__.py'
@@ -34,44 +38,37 @@ jobs:
               if not os.path.exists(init_path) or not os.path.exists(manifest_path):
                   continue
               
-              # Extract bl_info from __init__.py
               with open(init_path, 'r') as f:
                   content = f.read()
               
-              # Find bl_info dictionary
               match = re.search(r'bl_info\s*=\s*\{([^}]+)\}', content, re.DOTALL)
               if not match:
-                  print(f"No bl_info found in {addon_name}")
                   continue
               
               bl_info_str = match.group(1)
               
-              # Extract version tuple
               version_match = re.search(r'"version"\s*:\s*\((\d+),\s*(\d+),\s*(\d+)\)', bl_info_str)
               if not version_match:
-                  print(f"No version found in bl_info for {addon_name}")
                   continue
               
               version = f"{version_match.group(1)}.{version_match.group(2)}.{version_match.group(3)}"
               
-              # Extract other fields
               name_match = re.search(r'"name"\s*:\s*"([^"]+)"', bl_info_str)
               tagline_match = re.search(r'"description"\s*:\s*"([^"]+)"', bl_info_str)
               author_match = re.search(r'"author"\s*:\s*"([^"]+)"', bl_info_str)
               blender_match = re.search(r'"blender"\s*:\s*\((\d+),\s*(\d+),\s*(\d+)\)', bl_info_str)
               
-              # Read current manifest
               with open(manifest_path, 'r') as f:
-                  manifest_content = f.read()
+                  original_manifest = f.read()
               
-              # Update version
+              manifest_content = original_manifest
+              
               manifest_content = re.sub(
                   r'version\s*=\s*"[^"]+"',
                   f'version = "{version}"',
                   manifest_content
               )
               
-              # Update name if found
               if name_match:
                   manifest_content = re.sub(
                       r'name\s*=\s*"[^"]+"',
@@ -79,7 +76,6 @@ jobs:
                       manifest_content
                   )
               
-              # Update tagline from description if found
               if tagline_match:
                   manifest_content = re.sub(
                       r'tagline\s*=\s*"[^"]+"',
@@ -87,7 +83,6 @@ jobs:
                       manifest_content
                   )
               
-              # Update maintainer from author if found
               if author_match:
                   manifest_content = re.sub(
                       r'maintainer\s*=\s*"[^"]+"',
@@ -95,7 +90,6 @@ jobs:
                       manifest_content
                   )
               
-              # Update blender_version_min if found
               if blender_match:
                   blender_ver = f"{blender_match.group(1)}.{blender_match.group(2)}.{blender_match.group(3)}"
                   manifest_content = re.sub(
@@ -104,12 +98,25 @@ jobs:
                       manifest_content
                   )
               
-              # Write updated manifest
-              with open(manifest_path, 'w') as f:
-                  f.write(manifest_content)
-              
-              print(f"Synced {addon_name}: v{version}")
+              if manifest_content != original_manifest:
+                  with open(manifest_path, 'w') as f:
+                      f.write(manifest_content)
+                  changes_made = True
+                  print(f"Updated {addon_name}: v{version}")
+              else:
+                  print(f"No changes for {addon_name}: v{version}")
+          
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f"changes_made={'true' if changes_made else 'false'}\n")
           EOF
+      - name: Commit synced manifests
+        if: steps.sync.outputs.changes_made == 'true'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add addons/*/blender_manifest.toml
+          git commit -m "Auto-sync manifest versions from bl_info [skip ci]"
+          git push
       - name: Build Extensions
         run: |
           mkdir -p dist
