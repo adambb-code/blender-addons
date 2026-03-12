@@ -65,27 +65,22 @@ jobs:
               
               info = {}
               
-              # Extract version
               version_match = re.search(r'"version"\s*:\s*\((\d+),\s*(\d+),\s*(\d+)\)', bl_info_str)
               if version_match:
                   info['version'] = f"{version_match.group(1)}.{version_match.group(2)}.{version_match.group(3)}"
               
-              # Extract name
               name_match = re.search(r'"name"\s*:\s*"([^"]+)"', bl_info_str)
               if name_match:
                   info['name'] = name_match.group(1)
               
-              # Extract description
               desc_match = re.search(r'"description"\s*:\s*"([^"]+)"', bl_info_str)
               if desc_match:
                   info['description'] = desc_match.group(1)
               
-              # Extract author
               author_match = re.search(r'"author"\s*:\s*"([^"]+)"', bl_info_str)
               if author_match:
                   info['author'] = author_match.group(1)
               
-              # Extract blender version
               blender_match = re.search(r'"blender"\s*:\s*\((\d+),\s*(\d+),\s*(\d+)\)', bl_info_str)
               if blender_match:
                   info['blender'] = f"{blender_match.group(1)}.{blender_match.group(2)}.{blender_match.group(3)}"
@@ -150,7 +145,6 @@ jobs:
               
               return toml_content
 
-          # Process each addon
           for addon_name in os.listdir('addons'):
               addon_path = f'addons/{addon_name}'
               
@@ -160,23 +154,19 @@ jobs:
               init_path = f'{addon_path}/__init__.py'
               manifest_path = f'{addon_path}/blender_manifest.toml'
               
-              # Check __init__.py exists
               if not os.path.exists(init_path):
                   warnings.append(f"{addon_name}: No __init__.py found, skipping")
                   continue
               
-              # Read current __init__.py
               with open(init_path, 'r') as f:
                   current_init = f.read()
               
-              # Extract bl_info
               bl_info = extract_bl_info(current_init)
               
               if not bl_info:
                   errors.append(f"{addon_name}: No bl_info found in __init__.py")
                   continue
               
-              # Validate required fields
               required_fields = ['name', 'version', 'author', 'description', 'blender']
               missing = [f for f in required_fields if f not in bl_info]
               
@@ -184,27 +174,29 @@ jobs:
                   errors.append(f"{addon_name}: bl_info missing required fields: {', '.join(missing)}")
                   continue
               
-              # Check version change
-              previous_init = get_previous_file_content(init_path)
+              toml_exists = os.path.exists(manifest_path)
               
-              if previous_init:
-                  previous_bl_info = extract_bl_info(previous_init)
+              if toml_exists:
+                  previous_init = get_previous_file_content(init_path)
                   
-                  # Remove bl_info for code comparison
-                  current_code = re.sub(r'bl_info\s*=\s*\{[^}]+\}', '', current_init).strip()
-                  previous_code = re.sub(r'bl_info\s*=\s*\{[^}]+\}', '', previous_init).strip()
-                  
-                  code_changed = current_code != previous_code
-                  
-                  if previous_bl_info:
-                      version_changed = bl_info.get('version') != previous_bl_info.get('version')
+                  if previous_init:
+                      previous_bl_info = extract_bl_info(previous_init)
                       
-                      if code_changed and not version_changed:
-                          errors.append(f"{addon_name}: Code changed but version not bumped. Current: {bl_info.get('version')}")
-                          continue
+                      current_code = re.sub(r'bl_info\s*=\s*\{[^}]+\}', '', current_init).strip()
+                      previous_code = re.sub(r'bl_info\s*=\s*\{[^}]+\}', '', previous_init).strip()
+                      
+                      code_changed = current_code != previous_code
+                      
+                      if previous_bl_info:
+                          version_changed = bl_info.get('version') != previous_bl_info.get('version')
+                          
+                          if code_changed and not version_changed:
+                              errors.append(f"{addon_name}: Code changed but version not bumped. Current: {bl_info.get('version')}")
+                              continue
+              else:
+                  print(f"{addon_name}: First time setup, creating toml")
               
-              # Generate or update toml
-              if not os.path.exists(manifest_path):
+              if not toml_exists:
                   print(f"{addon_name}: Generating new blender_manifest.toml")
                   toml_content = generate_toml(addon_name, bl_info)
                   with open(manifest_path, 'w') as f:
@@ -228,18 +220,15 @@ jobs:
               
               print(f"{addon_name}: Valid (v{bl_info['version']})")
 
-          # Print warnings
           for warning in warnings:
               print(f"WARNING: {warning}")
 
-          # Handle errors
           if errors:
               print("\n=== ERRORS ===")
               for error in errors:
                   print(f"ERROR: {error}")
               sys.exit(1)
 
-          # Save addons to build for later steps
           import json
           with open('addons_to_build.json', 'w') as f:
               json.dump(addons_to_build, f)
@@ -268,7 +257,6 @@ jobs:
               zip -r "../dist/${addon_name}.zip" "$addon_name"
               cd ..
               
-              # Also create versioned copy for releases
               cp "dist/${addon_name}.zip" "dist/${addon_name}_v${version}.zip"
               
               echo "Built: ${addon_name} v${version}"
@@ -340,7 +328,6 @@ jobs:
           import os
           import subprocess
 
-          # Load addons to build
           if not os.path.exists('addons_to_build.json'):
               print("No addons to build")
               exit(0)
@@ -360,7 +347,6 @@ jobs:
                   print(f"Zip not found: {zip_file}")
                   continue
               
-              # Check if release already exists
               result = subprocess.run(
                   ['gh', 'release', 'view', tag_name],
                   capture_output=True,
@@ -369,7 +355,6 @@ jobs:
               
               release_exists = result.returncode == 0
               
-              # Generate changelog from recent commits for this addon
               changelog_result = subprocess.run(
                   ['git', 'log', '--oneline', '-10', '--', f'addons/{name}/'],
                   capture_output=True,
@@ -382,7 +367,6 @@ jobs:
                   changelog = f"## {display_name} v{version}\n\n### Changes\n"
                   for line in commits.split('\n'):
                       if line and '[skip ci]' not in line:
-                          # Remove commit hash for cleaner look
                           msg = ' '.join(line.split(' ')[1:])
                           if msg:
                               changelog += f"- {msg}\n"
@@ -391,10 +375,8 @@ jobs:
               
               if release_exists:
                   print(f"Updating release: {tag_name}")
-                  # Delete old release and tag
                   subprocess.run(['gh', 'release', 'delete', tag_name, '-y', '--cleanup-tag'], capture_output=True)
               
-              # Create new release
               print(f"Creating release: {tag_name}")
               subprocess.run([
                   'gh', 'release', 'create', tag_name,
