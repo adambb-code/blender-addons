@@ -1,0 +1,12 @@
+schema_version = "1.0.3"
+id = "bake_anim_to_shapekeys"
+name = "Bake Animation to Shape Keys"
+version = "1.2.0"
+tagline = "Bake complex animations and modifiers to shape keys for GLB export"
+maintainer = "adambb-code"
+type = "add-on"
+blender_version_min = "5.1.0"
+license = ["SPDX:GPL-3.0-or-later"]
+
+[permissions]
+files = "Export GLB files"
